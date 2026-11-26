@@ -185,6 +185,8 @@ try{const s=localStorage.getItem("bk1");if(s)S=Object.assign(S,JSON.parse(s))}ca
 let appId=null;
 let isCloudSynced = false;
 
+let isCloudSynced = false;
+
 function save(){
     S.last = Date.now();
     try{ localStorage.setItem("bk1", JSON.stringify(S)); }catch(e){}
@@ -580,36 +582,45 @@ function start(){
 }
 
 // ЗАПУСК ИГРЫ (с защитой от падений ВК)
-start();
+async function initGame(){
+    // 1. Загружаем локальные сохранения (на случай, если нет интернета)
+    try {
+        const s = localStorage.getItem("bk1");
+        if (s) S = Object.assign(S, JSON.parse(s));
+    } catch(e){}
 
-// Отдельно инициализируем VK (если мы внутри ВК)
-if(window.vkBridge){
-  try { window.vkBridge.send("VKWebAppInit").catch(function(){}); } catch(e){}
-  
-  try {
-    window.vkBridge.send("VKWebAppStorageGet", {keys: ["bk1"]}).then(function(data){
-      if(data && data.keys && data.keys[0] && data.keys[0].value){
-        var parsed = JSON.parse(data.keys[0].value);
-        
-        if(parsed && ( (!S.last) || (parsed.last > (S.last || 0)) || ((parsed.all || 0) > (S.all || 0)) )){
-          Object.assign(S, parsed);
-          build(); draw(); upd();
+    // 2. Загружаем сохранения из ВК
+    if (window.vkBridge) {
+        try {
+            await window.vkBridge.send("VKWebAppInit");
+            const data = await window.vkBridge.send("VKWebAppStorageGet", {keys: ["bk1"]});
+            
+            if (data && data.keys && data.keys[0] && data.keys[0].value) {
+                const vkS = JSON.parse(data.keys[0].value);
+                // Если в облаке ВК очков БОЛЬШЕ, чем на устройстве — берем облако!
+                if (vkS.all > (S.all || 0) || vkS.pts > (S.pts || 0)) {
+                    S = Object.assign(S, vkS);
+                    console.log("Загружено сохранение из ВК");
+                }
+            }
+            
+            try {
+                const launch = await window.vkBridge.send("VKWebAppGetLaunchParams");
+                if (launch) {
+                    if (launch.vk_app_id) appId = launch.vk_app_id;
+                    if (launch.vk_language) EN = ["ru","be","kk","uk","uz"].indexOf(launch.vk_language) === -1;
+                }
+            } catch(e){}
+        } catch(e) {
+            console.log("Не ВК окружение или ошибка ВК");
         }
-      }
-      isCloudSynced = true; 
-    }).catch(function(){ isCloudSynced = true; }); 
-  } catch(e){ isCloudSynced = true; }
-  
-  try {
-    window.vkBridge.send("VKWebAppGetLaunchParams").then(function(launch){
-      if(launch){
-        if(launch.vk_app_id) appId = launch.vk_app_id;
-        if(launch.vk_language) EN = ["ru","be","kk","uk","uz"].indexOf(launch.vk_language) === -1;
-        applyLang();
-      }
-    }).catch(function(){});
-  } catch(e){}
+    }
+
+    // 3. Разрешаем сохранение в облако и запускаем игру
+    isCloudSynced = true;
+    start();
 }
-</script>
+
+initGame();</script>
 </body>
 </html>
