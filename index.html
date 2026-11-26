@@ -185,8 +185,6 @@ try{const s=localStorage.getItem("bk1");if(s)S=Object.assign(S,JSON.parse(s))}ca
 let appId=null;
 let isCloudSynced = false;
 
-let isCloudSynced = false;
-
 function save(){
     S.last = Date.now();
     try{ localStorage.setItem("bk1", JSON.stringify(S)); }catch(e){}
