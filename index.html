@@ -76,6 +76,61 @@ svg{display:block;width:100%;height:auto}
 .idl{animation:bob 1.8s ease-in-out infinite}.hp.jp{animation:jp .4s}#kb.jp{animation:jp .45s}@keyframes jp{40%{transform:translateY(-14px)}}
 .rg{fill:none;stroke:#f0b429;stroke-width:3;transform-box:fill-box;transform-origin:center;animation:rg .5s forwards}@keyframes rg{from{transform:scale(.3);opacity:1}to{transform:scale(2.4);opacity:0}}
 .nw{transform-box:fill-box;transform-origin:50% 0;animation:nw .45s}@keyframes nw{30%{transform:scale(1.15,1.25)}60%{transform:scale(.92,.9)}}
+/* Адаптация под ПК (широкие экраны) */
+@media (min-width: 900px) {
+  body {
+    overflow: hidden; /* Убираем прокрутку всей страницы */
+  }
+  #app {
+    max-width: 1200px;
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    grid-template-rows: auto auto 1fr;
+    gap: 16px;
+    padding: 16px;
+    height: 100vh;
+    box-sizing: border-box;
+  }
+  #top {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding: 0;
+  }
+  #boost {
+    grid-column: 1 / 2;
+    margin: 0;
+    width: 100%;
+  }
+  #scene {
+    grid-column: 1 / 2;
+    grid-row: 2 / 4;
+    margin: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--paper);
+  }
+  #scene svg {
+    height: 100%;
+    width: auto;
+    max-width: 100%;
+    max-height: calc(100vh - 120px);
+  }
+  #tabs {
+    grid-column: 2 / 3;
+    grid-row: 2 / 3;
+    margin: 0;
+    padding: 0;
+  }
+  #shop {
+    grid-column: 2 / 3;
+    grid-row: 3 / 4;
+    margin: 0;
+    height: 100%;
+    max-height: calc(100vh - 130px);
+  }
+}
 </style>
 </head>
 <body>
@@ -128,7 +183,19 @@ const AUTO=[["Друзья-болельщики","Кричат «Давай!» �
 let S={pts:0,ball:0,hoop:0,stage:0,auto:[0,0,0,0,0],tab:0,all:0,run:0,stars:0,boost:0,st:0,mute:0,mg:[0,0,0],id:"",refd:"",rs:"",tut:0,taps:0,thx:0,got:[],noads:0,shortcut:0};
 try{const s=localStorage.getItem("bk1");if(s)S=Object.assign(S,JSON.parse(s))}catch(e){}
 let appId=null;
-function save(){S.last=Date.now();try{localStorage.setItem("bk1",JSON.stringify(S))}catch(e){}if(window.vkBridge&&Date.now()-(window.vkLc||0)>5000){window.vkLc=Date.now();try{window.vkBridge.send("VKWebAppStorageSet",{key:"bk1",value:JSON.stringify(S)}).catch(()=>{})}catch(e){}}}
+let isCloudSynced = false;
+
+function save(){
+    S.last = Date.now();
+    try{ localStorage.setItem("bk1", JSON.stringify(S)); }catch(e){}
+    
+    if(window.vkBridge && isCloudSynced && Date.now() - (window.vkLc || 0) > 5000){
+        window.vkLc = Date.now();
+        try{
+            window.vkBridge.send("VKWebAppStorageSet", {key:"bk1", value: JSON.stringify(S)}).catch(()=>{});
+        }catch(e){}
+    }
+}
 const fmt=n=>{n=Math.floor(n);const u=EN?["","K","M","B","T"]:["","тыс","млн","млрд","трлн"];let i=0,v=n;while(v>=1000&&i<4){v/=1000;i++}return i?(v<10?v.toFixed(2):v<100?v.toFixed(1):Math.floor(v))+" "+u[i]:""+n};
 const aCost=i=>Math.ceil(AUTO[i][2]*Math.pow(1.22,S.auto[i]));
 const mult=()=>(1+.25*(S.stars||0))*(1+.01*(S.mast||0))*(has(3)?1.15:1)*((S.boost||0)>Date.now()?2:1);
@@ -518,17 +585,21 @@ start();
 // Отдельно инициализируем VK (если мы внутри ВК)
 if(window.vkBridge){
   try { window.vkBridge.send("VKWebAppInit").catch(function(){}); } catch(e){}
+  
   try {
     window.vkBridge.send("VKWebAppStorageGet", {keys: ["bk1"]}).then(function(data){
       if(data && data.keys && data.keys[0] && data.keys[0].value){
         var parsed = JSON.parse(data.keys[0].value);
-        if(parsed && (parsed.all||0) >= (S.all||0)){
+        
+        if(parsed && ( (!S.last) || (parsed.last > (S.last || 0)) || ((parsed.all || 0) > (S.all || 0)) )){
           Object.assign(S, parsed);
           build(); draw(); upd();
         }
       }
-    }).catch(function(){});
-  } catch(e){}
+      isCloudSynced = true; 
+    }).catch(function(){ isCloudSynced = true; }); 
+  } catch(e){ isCloudSynced = true; }
+  
   try {
     window.vkBridge.send("VKWebAppGetLaunchParams").then(function(launch){
       if(launch){
